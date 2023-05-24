@@ -374,7 +374,12 @@ func (ale AmbiguousLocationError) Error() string {
 func (loc *NormalLocationSpec) Find(t *proc.Target, processArgs []string, scope *proc.EvalScope, locStr string, includeNonExecutableLines bool, substitutePathRules [][2]string) ([]api.Location, error) {
 	limit := maxFindLocationCandidates
 	var candidateFiles []string
-	for _, sourceFile := range t.BinInfo().Sources {
+	sources := t.BinInfo().Sources
+	sourcesMap := make(map[string]struct{}, len(sources))
+
+	for _, sourceFile := range sources {
+		sourcesMap[sourceFile] = struct{}{}
+
 		substFile := sourceFile
 		if len(substitutePathRules) > 0 {
 			substFile = SubstitutePath(sourceFile, substitutePathRules)
@@ -385,6 +390,14 @@ func (loc *NormalLocationSpec) Find(t *proc.Target, processArgs []string, scope 
 				break
 			}
 		}
+	}
+
+	// Allow path substitution from path not known to binary sources.
+	substPath := SubstitutePath(loc.Base, substitutePathRules)
+	_, ok := sourcesMap[substPath]
+
+	if substPath != loc.Base && ok {
+		candidateFiles = append(candidateFiles, substPath)
 	}
 
 	limit -= len(candidateFiles)
